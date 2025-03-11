@@ -50,6 +50,8 @@ def typing_mode(src):
         while True:
             if newtext: 
                 if "stop typing mode" in newtext:
+                    engine.say("typing mode off")
+                    engine.runAndWait()
                     break
                 else:
                     if "press enter" in newtext:
@@ -162,10 +164,9 @@ def option(src,text):
 
 def main():
    
-    with sr.Microphone() as src:  
+    with sr.Microphone() as src: 
         while True:
             command = listen(src)
-            command="hey sky give me code for matrix addition"
             if command is None:
                 continue  
 
@@ -181,7 +182,7 @@ def main():
                         if text is None:
                             continue
 
-                        if "continue command" in text:
+                        if "command mode" in text:
                             engine.say("command mode on")
                             engine.runAndWait()
                             while True:
