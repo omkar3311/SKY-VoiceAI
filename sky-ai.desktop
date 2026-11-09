@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Sky AI
+Comment=Your Own Assistant
+Exec=/home/omkar/Desktop/sky-ai/start_sky.sh
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=3
+Categories=Utility;AudioVideo;AI;
