@@ -46,10 +46,9 @@ def typing_mode(src):
         engine.say("typing mode on")
         engine.runAndWait()
         newtext=listen(src)
-
         while True:
             if newtext: 
-                if "stop typing mode" in newtext:
+                if "stop typing mode" in newtext:            
                     engine.say("typing mode off")
                     engine.runAndWait()
                     break
@@ -59,19 +58,29 @@ def typing_mode(src):
                     elif "backspace" in newtext:
                         p.hotkey("ctrl","backspace")
                     elif "copy" in newtext:
+                        p.click()
+                        time.sleep(0.2)
                         p.hotkey("ctrl","c")
+                        time.sleep(0.2)
+                        engine.say("copied")
+                        engine.runAndWait()
+                    elif "copy all" in newtext:
+                        p.hotkey("ctrl", "a")  
+                        time.sleep(0.2)  
+                        p.hotkey("ctrl", "c")  
+                        time.sleep(0.2) 
+                        engine.say("copied")
+                        engine.runAndWait()
                     elif "paste" in newtext:
-                        p.hotkey("ctrl","v")
+                        p.hotkey("ctrl", "v") 
+                        engine.say("pasted")
+                        engine.runAndWait()
                     else:
                         p.typewrite(newtext + " ")
                     newtext=listen(src)
             else:
                 newtext=listen(src)
-
-def option(src,text):
-    print(f"in option: {text}")
-
-    if "joke" in text:
+def joke():
         url = "https://official-joke-api.appspot.com/random_joke"
         response = requests.get(url)
         joke = response.json()
@@ -81,6 +90,28 @@ def option(src,text):
         time.sleep(1)
         engine.say(joke["punchline"])
         engine.runAndWait()
+
+def code_win(key,code,line="list"):
+                root.title(key)
+                frame = tk.Frame(root)
+                frame.pack(fill="both", expand=True, padx=10, pady=10)
+                scrollbar = tk.Scrollbar(frame)
+                scrollbar.pack(side="right", fill="y")
+                text = tk.Text(frame, wrap="word", font=("Arial", 12), yscrollcommand=scrollbar.set)
+                text.pack(fill="both", expand=True)
+                text.insert("1.0", code)
+                text.config(state="normal")
+                scrollbar.config(command=text.yview)
+                engine .say(f"here is code {line}")
+                engine.runAndWait()
+                root.after(5000,root.destroy)
+                root.mainloop()
+
+def option(src,text):
+    print(f"in option: {text}")
+
+    if "joke" in text:
+        joke()
 
     elif "introduce" in text or "yourself" in text:
         engine.say(d.intro)
@@ -103,7 +134,7 @@ def option(src,text):
                 return
             
     elif "search" in text:
-        query=text.split("search")[1]
+        query=text.replace("search","")
         query1=query.split("on")[0]
 
         if "google" in text:      
@@ -115,42 +146,30 @@ def option(src,text):
         return   
     
     elif "vs " not in text and "code" in text :
-        line=text.split("for ")
+        line=text.replace("for ","")
+        line=line.split("code")
         if line[1] is None:
             engine.say("For what")
             engine.runAndWait()
             return
         if "list" in text:
+            code_line=""
             for key,code in d.code.items():
                 print(key)
-                return
-        for key,code in d.code.items():
-            if key in line[1]:
-                root.title(key)
-                frame = tk.Frame(root)
-                frame.pack(fill="both", expand=True, padx=10, pady=10)
-                scrollbar = tk.Scrollbar(frame)
-                scrollbar.pack(side="right", fill="y")
-                text = tk.Text(frame, wrap="word", font=("Arial", 12), yscrollcommand=scrollbar.set)
-                text.pack(fill="both", expand=True)
-                text.insert("1.0", code)
-                text.config(state="normal")
-                scrollbar.config(command=text.yview)
-                engine .say(f"here is code for {line[1]}")
-                engine.runAndWait()
-                root.after(5000,root.destroy)
-                root.mainloop()
-                return
+                code_line = code_line + key + "\n"
+            code_win("list of code",code_line)
+        else:
+            for key,code in d.code.items():
+                if key in line[1]:
+                    code_win(key,code,line[1])
+                    break   
+            else:
+                    engine.say("sorry, i don't have that one")
+                    engine.runAndWait()
+                    return
             
     elif "typing mode" in text:
         typing_mode(src)
-
-    elif "on wifi" in text:
-        os.system("netsh interface set interface Wi-Fi enabled")
-        return
-    elif "off wifi" in text:
-        os.system("netsh interface set interface Wi-Fi disabled")
-        return
     
     elif "stop" in text:
         engine.say("I take your leave")
@@ -172,7 +191,6 @@ def main():
 
             elif "sky" in command:
                 line=command.split("sky ")
-    
                 if "sky" in line[0]:
                     engine.say("Hello master")
                     engine.runAndWait()

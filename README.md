@@ -9,7 +9,6 @@ SKY is a voice-controlled assistant designed to perform various tasks, including
 - Searching on Google and YouTube  
 - Telling jokes  
 - Providing pre-written code  
-- Controlling WiFi  
 - Entering text in typing mode  
 
 ## How to Use  
@@ -22,7 +21,8 @@ SKY will respond with **"Hello master"**.
 
 #### General Commands:  
 - **"Introduce yourself"** → SKY will introduce itself.  
-- **"Tell me a joke"** → SKY will tell a random joke.  
+- **"Tell me a joke"** → SKY will tell a random joke.
+- **"Turn on typing mode"** → SKY enter in typing mode 
 - **"Stop"** → Exits the program.  
 
 #### Opening Applications & Websites:  
@@ -39,15 +39,14 @@ SKY will respond with **"Hello master"**.
 
 #### Typing Mode:  
 - **"Typing mode on"** → Enables voice-based typing.  
-
+- **"Copy"**  → Copy sentence
 Commands within typing mode:  
 - **"Press Enter"** → Presses the Enter key.  
-- **"Backspace"** → Deletes the last word.  
-- **"Stop typing mode"** → Exits typing mode.  
-
-#### WiFi Control:  
-- **"Turn on WiFi"** → Enables WiFi.  
-- **"Turn off WiFi"** → Disables WiFi.  
+- **"Backspace"** → Deletes the last word. 
+- **"Copy"**  → Copy sentence 
+- **"Copy all"** → Copy all text
+- **"paste"** → Paste
+- **"Stop typing mode"** → Exits typing mode. 
 
 ## Installation & Requirements  
 
