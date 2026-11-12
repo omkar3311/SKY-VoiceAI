@@ -1,0 +1,144 @@
+import re
+from typing import Optional
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_groq import ChatGroq
+from sky.config import GROQ_MODEL, get_groq_api_key, rotate_groq_api_key
+from sky.agents.state import SkyAgentState
+from sky.tools.registry import registry
+
+TOOLBUILDER_SYSTEM_PROMPT = """You are the Toolbuilder Agent of 'Sky', an autonomous desktop AI assistant.
+Your sole job is to write reliable, production-ready Python tools for the Executor Agent when a required capability is missing.
+
+REQUIREMENTS FOR YOUR CODE:
+1. Always import `from langchain_core.tools import tool`.
+2. Define exactly one main function decorated with `@tool` matching the requested tool name.
+3. Include clear Python type annotations (e.g., `str`, `int`, `Optional[str] = None`, `bool`).
+4. Include a detailed Google or Sphinx style docstring describing what the tool does and its parameters.
+5. Make sure the code is completely self-contained. Use Python standard libraries (os, sys, subprocess, json, urllib, pathlib, datetime, math, re, shutil, glob) or standard packages (requests, psutil).
+6. Wrap all side-effects and risky operations in `try...except Exception as e:` and return informative string error messages instead of raising uncaught exceptions.
+7. Return string outputs describing the result clearly.
+8. Enclose your Python code in a ```python ... ``` markdown code block. Do NOT write extraneous conversational filler before or after the code block.
+
+Example Tool Template:
+```python
+import os
+import subprocess
+from typing import Optional
+from langchain_core.tools import tool
+
+@tool
+def calculate_file_hash(file_path: str, algorithm: str = "sha256") -> str:
+    \"\"\"
+    Compute cryptographic hash (md5, sha1, sha256) of a local file.
+    
+    Args:
+        file_path: Path to the target file.
+        algorithm: Hash algorithm ('md5', 'sha1', 'sha256').
+    \"\"\"
+    import hashlib
+    try:
+        path = os.path.expanduser(file_path)
+        if not os.path.exists(path):
+            return f"Error: File '{path}' not found."
+        h = getattr(hashlib, algorithm.lower(), hashlib.sha256)()
+        with open(path, "rb") as f:
+            while chunk := f.read(8192):
+                h.update(chunk)
+        return f"{algorithm.upper()} hash of {file_path}: {h.hexdigest()}"
+    except Exception as e:
+        return f"Error calculating hash: {str(e)}"
+```
+"""
+
+def extract_python_code(text: str) -> str:
+    """Extract code from ```python ... ``` markdown block."""
+    match = re.search(r"```python\s*(.*?)\s*```", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    match = re.search(r"```\s*(.*?)\s*```", text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return text.strip()
+
+def toolbuilder_node(state: SkyAgentState) -> dict:
+    """Invoked when Executor requests a new tool to be built."""
+    request = state.get("missing_tool_request", {}) or {}
+    tool_name = request.get("tool_name", "custom_tool")
+    description = request.get("description", "A custom tool for the task")
+    specs = request.get("expected_inputs_and_outputs", "Standard inputs and string output")
+    user_task = state.get("user_task", "")
+    last_error = state.get("last_build_error")
+    attempts = state.get("tool_build_attempts", 0) + 1
+
+    prompt = f"""Task from User: {user_task}
+Needed Tool Name: {tool_name}
+Tool Purpose & Description: {description}
+Expected Arguments & Return: {specs}
+"""
+    if last_error:
+        prompt += f"\nATTENTION: The previous attempt to build this tool failed with error:\n{last_error}\nPlease fix the syntax or logic error and generate corrected Python code."
+
+    llm = ChatGroq(
+        model=GROQ_MODEL,
+        api_key=get_groq_api_key(),
+        temperature=0.1,
+    )
+
+    try:
+        response = llm.invoke([
+            SystemMessage(content=TOOLBUILDER_SYSTEM_PROMPT),
+            HumanMessage(content=prompt)
+        ])
+    except Exception as e:
+        err_str = str(e).lower()
+        if "rate limit" in err_str or "429" in err_str or "quota" in err_str:
+            new_key = rotate_groq_api_key()
+            fallback_llm = ChatGroq(
+                model="qwen/qwen3.8-27b",
+                api_key=new_key,
+                temperature=0.1,
+            )
+            response = fallback_llm.invoke([
+                SystemMessage(content=TOOLBUILDER_SYSTEM_PROMPT),
+                HumanMessage(content=prompt)
+            ])
+        else:
+            raise e
+
+    code = extract_python_code(response.content)
+
+    return {
+        "missing_tool_request": {
+            "tool_name": tool_name,
+            "description": description,
+            "code": code,
+        },
+        "tool_build_attempts": attempts,
+        "last_build_error": None
+    }
+
+def register_tool_node(state: SkyAgentState) -> dict:
+    """Validates and registers the tool code generated by Toolbuilder."""
+    request = state.get("missing_tool_request", {}) or {}
+    tool_name = request.get("tool_name", "custom_tool")
+    code = request.get("code", "")
+    built_tools = list(state.get("built_tools", []))
+
+    success, message = registry.save_and_register_tool(tool_name, code)
+    if success:
+        built_tools.append(tool_name)
+        # Notify executor via a message that tool is now ready
+        notification = AIMessage(
+            content=f"[Toolbuilder Agent]: Successfully built and registered tool '{tool_name}'! It is now active in your toolkit. Proceed with executing the user's task."
+        )
+        return {
+            "built_tools": built_tools,
+            "missing_tool_request": None,
+            "last_build_error": None,
+            "messages": [notification]
+        }
+    else:
+        # Failed to register or parse
+        return {
+            "last_build_error": message
+        }
