@@ -23,3 +23,5 @@ __pycache__/
 
 *.ogg
 *.sh
+
+workspace/
